@@ -177,7 +177,7 @@ int main (int argc, char *argv[])
         ARSAL_PRINT(ARSAL_PRINT_ERROR, TAG, "Creation of IHM failed.");
         failed = 1;
     }
-    
+
     if (!failed)
     {
         deviceManager = malloc(sizeof(DEVICE_MANAGER_t));
@@ -282,6 +282,8 @@ int main (int argc, char *argv[])
         {
             usleep(50);
         }
+        ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "Disconnecting");
+
         
         IHM_PrintInfo(ihm, "Disconnecting ...");
     }
@@ -339,13 +341,14 @@ int main (int argc, char *argv[])
         IHM_Delete (&ihm);
         ARSAL_Print_SetCallback (NULL); //reset the callback to print
         
-        /* print error */
+        // print error
         if (gErrorStr[0] != '\0')
         {
             //ARSAL_PRINT(ARSAL_PRINT_ERROR, TAG, "%s", gErrorStr);
             printf("Error: %s", gErrorStr);
         }
     }
+
     
     ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "-- END --");
     
@@ -508,6 +511,8 @@ void unregisterARCommandsCallbacks ()
 void onDisconnectNetwork (ARNETWORK_Manager_t *manager, ARNETWORKAL_Manager_t *alManager, void *customData)
 {
     // Network Disconnected
+    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "onDisconnectNetwork");
+
     gIHMRun = 0; //stop IHM
 }
 
@@ -731,6 +736,8 @@ void onInputEvent (eIHM_INPUT_EVENT event, void *customData)
     switch (event)
     {
         case IHM_INPUT_EVENT_EXIT:
+
+			ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "IHM_INPUT_EVENT_EXIT");
             gIHMRun = 0;
             break;
         case IHM_INPUT_EVENT_JUMP:
