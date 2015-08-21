@@ -2,44 +2,21 @@
 #include <stdint.h>
 #include <stdarg.h>
 
+#ifdef WIN32
+
+#include <stdint.h>
+typedef uint8_t u_int8_t;
+typedef uint16_t u_int16_t;
+typedef uint32_t u_int32_t;
+#endif
+
 #include <libARSAL/ARSAL.h>
-/*
+
 #include <libARController/ARController.h>
 #include <libARDiscovery/ARDiscovery.h>
 #include <libARCommands/ARCommands.h>
-#include <libARController/ARCONTROLLER_Feature.h>*/
-#include "unityMultiplatformSendMEssage.h"
-
-typedef enum 
-{
-	PLOP,
-} eARCONTROLLER_DEVICE_STATE;
-
-typedef enum 
-{
-	PLOP2,
-} eARCONTROLLER_ERROR;
-
-
-typedef enum 
-{
-	PLOP3,
-} eARSAL_PRINT_LEVEL;
-
-typedef enum 
-{
-	PLOP4,
-} eARCOMMANDS_ARDRONE3_PILOTINGSTATE_FLYINGSTATECHANGED_STATE;
-
-
-typedef enum 
-{
-	PLOP5,
-} eARCOMMANDS_ARDRONE3_PILOTINGSTATE_ALERTSTATECHANGED_STATE;
-
-typedef int ARCONTROLLER_Frame_t;
-
-typedef int ARCONTROLLER_Device_t;
+#include <libARController/ARCONTROLLER_Feature.h>
+#include "UnityMultiplatformSendMessage.h"
 
 // called when the state of the device controller has changed
 void stateChanged (eARCONTROLLER_DEVICE_STATE newState, eARCONTROLLER_ERROR error, void *customData);
@@ -96,12 +73,12 @@ int PrintLog (eARSAL_PRINT_LEVEL level, const char *tag, const char *format, va_
 
 
 struct ARdrone3Plugin* ARdrone3_Connect() {
-	ARSAL_Print_SetCallback(PrintLog);
-	ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "ARdrone3_Connect");
-	return NULL;
-
-// local declarations
-   /* int failed = 0;
+    ARSAL_Print_SetCallback(PrintLog);
+    ARSAL_Print_SetMinimumLevel(ARSAL_PRINT_VERBOSE);
+    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "ARdrone3_Connect");
+    
+    // local declarations
+    int failed = 0;
     struct ARdrone3Plugin* self = malloc(sizeof(struct ARdrone3Plugin));
     ARDISCOVERY_Device_t *device = NULL;
     ARCONTROLLER_Device_t *deviceController = NULL;
@@ -199,12 +176,12 @@ struct ARdrone3Plugin* ARdrone3_Connect() {
     
  
     
-    return self;*/
+    return self;
 }
 
 void ARdrone3_Disconnect(struct ARdrone3Plugin *self) {
     
-   /* ARCONTROLLER_Device_t *deviceController = NULL;
+    ARCONTROLLER_Device_t *deviceController = NULL;
     eARCONTROLLER_ERROR error = ARCONTROLLER_OK;
     eARCONTROLLER_DEVICE_STATE deviceState = ARCONTROLLER_DEVICE_STATE_MAX;
     //ARSAL_Sem_Init (&(self->stateSem), 0, 0);
@@ -231,12 +208,12 @@ void ARdrone3_Disconnect(struct ARdrone3Plugin *self) {
     
     ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "-- END --");
     
-    free(self);*/
+    free(self);
 }
 
 void ARDrone3_StartVideo(struct ARdrone3Plugin* self) {
     
-    /*eARCONTROLLER_ERROR error = ARCONTROLLER_OK;
+    eARCONTROLLER_ERROR error = ARCONTROLLER_OK;
     boolean failed = 0;
 
     
@@ -250,62 +227,62 @@ void ARDrone3_StartVideo(struct ARdrone3Plugin* self) {
             ARSAL_PRINT(ARSAL_PRINT_ERROR, TAG, "- error :%s", ARCONTROLLER_Error_ToString(error));
             failed = 1;
         }
-    }*/
+    }
 }
 
 
 void ARDrone3_refreshAllStates(struct ARdrone3Plugin* self) {
-    //self->deviceController->common->sendCommonAllStates(self->deviceController->common);
+    self->deviceController->common->sendCommonAllStates(self->deviceController->common);
 }
 
 void ARDrone3_TakeOff(struct ARdrone3Plugin *self) {
-    //self->deviceController->aRDrone3->sendPilotingTakeOff(self->deviceController->aRDrone3);
+    self->deviceController->aRDrone3->sendPilotingTakeOff(self->deviceController->aRDrone3);
 }
 
 void ARDrone3_Land(struct ARdrone3Plugin *self) {
-    //self->deviceController->aRDrone3->sendPilotingLanding(self->deviceController->aRDrone3);
+    self->deviceController->aRDrone3->sendPilotingLanding(self->deviceController->aRDrone3);
 }
 
 void ARDrone3_SendCameraOrientation(struct ARdrone3Plugin *self, int tilt, int pan) {
-  //  self->deviceController->aRDrone3->sendCameraOrientation(self->deviceController->aRDrone3, tilt, pan);
+    self->deviceController->aRDrone3->sendCameraOrientation(self->deviceController->aRDrone3, tilt, pan);
 }
 
 void ARDrone3_SendPCMD(struct ARdrone3Plugin *self, int flag, int roll, int pitch, int yaw, int gaz) {
-   // self->deviceController->aRDrone3->sendPilotingPCMD (self->deviceController->aRDrone3, flag , roll, pitch, yaw, gaz, 0);
+    self->deviceController->aRDrone3->sendPilotingPCMD (self->deviceController->aRDrone3, flag , roll, pitch, yaw, gaz, 0);
 }
 
 void PilotingStateFlyingStateChangedCallback (eARCOMMANDS_ARDRONE3_PILOTINGSTATE_FLYINGSTATECHANGED_STATE state, void *custom) {
-   /* char sendingArg[5];
+    char sendingArg[5];
     snprintf(sendingArg, 5, "%d", (int)state);
-    UnitySendMessage("DeviceController", "updatePilotingState", sendingArg);*/
+    UnitySendMessage("DeviceController", "updatePilotingState", sendingArg);
 }
 
 void PilotingAlertStateChangedCallback (eARCOMMANDS_ARDRONE3_PILOTINGSTATE_ALERTSTATECHANGED_STATE state, void *customData) {
-    //char sendingArg[5];
-   // snprintf(sendingArg, 5, "%d", (int)state);
-    //UnitySendMessage("DeviceController", "updateAlertState", sendingArg);
+    char sendingArg[5];
+    snprintf(sendingArg, 5, "%d", (int)state);
+    UnitySendMessage("DeviceController", "updateAlertState", sendingArg);
 }
 
 void PilotingAttitudeChangedCallback (float roll, float pitch, float yaw, void *custom) {
-   /* int size = 50; // to be fitted because value is very often
+    int size = 50; // to be fitted because value is very often
     char *sendingArg = malloc(size);
     snprintf(sendingArg, size, "%.3f %.3f %.3f", roll, pitch, yaw);
     UnitySendMessage("DeviceController", "updateAttitude", sendingArg);
-    free(sendingArg);*/
+    free(sendingArg);
 }
 
 
 void CommonBatteryStateChangedCallback (uint8_t val, void *custom) {
-    /*char sendingArg[5];
+    char sendingArg[5];
     snprintf(sendingArg, 5, "%d", (int)val);
-    UnitySendMessage("DeviceController", "updateBatteryState", sendingArg);*/
+    UnitySendMessage("DeviceController", "updateBatteryState", sendingArg);
 }
 
 void CameraStateOrientationCallback (int8_t tilt, int8_t pan, void *custom) {
-    /*char sendingArg[11];
+    char sendingArg[11];
     snprintf(sendingArg, 11, "%d %d", tilt, pan);
     UnitySendMessage("DeviceController", "updateCameraOrientation", sendingArg);
-*/}
+}
 
 /*****************************************
  *
@@ -315,7 +292,7 @@ void CameraStateOrientationCallback (int8_t tilt, int8_t pan, void *custom) {
 
 
 void registerCallbacks (ARCONTROLLER_Device_t* deviceController) {
-   /* 
+    
     // Commands of class : MediaRecordState:
     ARCOMMANDS_Decoder_SetARDrone3MediaRecordStatePictureStateChangedCallback (NULL, NULL);
     ARCOMMANDS_Decoder_SetARDrone3MediaRecordStateVideoStateChangedCallback (NULL, NULL);
@@ -391,19 +368,19 @@ void registerCallbacks (ARCONTROLLER_Device_t* deviceController) {
     
     ARCOMMANDS_Decoder_SetCommonCommonStateBatteryStateChangedCallback(&CommonBatteryStateChangedCallback , deviceController->aRDrone3);
     
-    */
+    
 }
 
 
 // called when the state of the device controller has changed
 void stateChanged (eARCONTROLLER_DEVICE_STATE newState, eARCONTROLLER_ERROR error, void *customData)
 {
-   /*ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "    - stateChanged newState: %d .....", newState);
+   ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "    - stateChanged newState: %d .....", newState);
     //struct ARdrone3Plugin* self = (struct ARdrone3Plugin*) customData;
     
     char sendingArg[5];
     snprintf(sendingArg, 5, "%d", (int)newState);
     UnitySendMessage("DeviceController", "updateDeviceControllerState", sendingArg);
-*/
+
     
 }

@@ -2,13 +2,13 @@ EXEC_NAME=JumpingSumoPiloting #output filename
 
 SDK_DIR=../../../ARSDKBuildUtils
 IDIR=./
-CC=gcc
+CC=/usr/bin/x86_64-w64-mingw32-gcc -fstack-protector
 CFLAGS=-I$(IDIR) -I $(SDK_DIR)/Targets/Windows/Install/include
 
 OBJDIR=obj
 LDIR = $(SDK_DIR)/Targets/Windows/Install/lib
 
-EXTERNAL_LIB=-lncurses -ljson
+EXTERNAL_LIB= -ljson
 
 LIBS=-L$(SDK_DIR)/Targets/Windows/Install/lib  -larcontroller -larcommands -lardiscovery -larstream  -larnetworkal -larnetwork -larsal  $(EXTERNAL_LIB)
 LIBS_DBG=-L$(SDK_DIR)/Targets/Windows/Install/lib -larsal_dbg -larcontroller_dbg -lardiscovery_dbg $(EXTERNAL_LIB)
@@ -29,7 +29,7 @@ $(OBJDIR)/%.o: %.c $(DEPS)
 	@ $(CC) -c -o $@ $< $(CFLAGS)
 
 $(EXEC_NAME): $(OBJ)
-	gcc -o $@ $^ $(CFLAGS) $(LIBS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
 
 .PHONY: clean
 

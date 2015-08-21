@@ -6,7 +6,7 @@
 //  Copyright (c) 2015 Parrot. All rights reserved.
 //
 
-#include "unityMultiplatformSendMessage.h"
+#include "UnityMultiplatformSendMessage.h"
 
 static UnityCommandCallback lastCallback = NULL;
 

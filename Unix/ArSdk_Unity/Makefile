@@ -3,16 +3,17 @@ DLL_NAME=Arsdk3Plugin.dll #output filename
 SDK_DIR=../../../ARSDKBuildUtils
 IDIR=./
 #CC=x86_64-w64-mingw32-gcc
-CC=gcc
-CFLAGS= -g -I$(IDIR) -I $(SDK_DIR)/Targets/Windows/Install/include
+CC=/usr/bin/x86_64-w64-mingw32-gcc
+CFLAGS= -g -I$(IDIR) -I $(SDK_DIR)/Targets/Windows/Install/include -Dlocaltime_r=localtime
 
 OBJDIR=obj
 LDIR = $(SDK_DIR)/Targets/Windows/Install/lib
 
-EXTERNAL_LIB=-lncurses -ljson
+#EXTERNAL_LIB=-lncurses -ljson
+EXTERNAL_LIB= -ljson -lwsock32 -lws2_32
 
-#LIBS= -g -L$(SDK_DIR)/Targets/Windows/Install/lib  -larcontroller -larcommands -lardiscovery -larstream  -larnetworkal -larnetwork -larsal  $(EXTERNAL_LIB)
-LIBS=
+#LIBS= -g -L$(SDK_DIR)/Targets/Windows/Install/lib  -larcontroller -larcommands -lardiscovery -larstream  -larnetworkal -larnetwork  $(EXTERNAL_LIB)
+LIBS=-L$(SDK_DIR)/Targets/Windows/Install/lib -larcontroller -larcommands -lardiscovery -larstream -larnetwork -larnetworkal -larsal $(EXTERNAL_LIB)
 LIBS_DBG=-L$(SDK_DIR)/Targets/Windows/Install/lib -larsal_dbg -larcontroller_dbg -lardiscovery_dbg $(EXTERNAL_LIB)
 
 _DEPS = 
@@ -26,10 +27,10 @@ all: $(DLL_NAME)
 
 $(OBJDIR)/%.o: %.c $(DEPS)
 	@ [ -d $(OBJDIR) ] || mkdir $(OBJDIR)
-	@ $(CC) -c -o $@ $< $(CFLAGS)
+	$(CC) -c -o $@ $< $(CFLAGS)
 
 $(DLL_NAME): $(OBJ)
-	gcc -shared -o $@ $^ $(CFLAGS) $(LIBS)
+	$(CC) -shared -o $@ $^ $(CFLAGS) $(LIBS)
 
 .PHONY: clean
 
