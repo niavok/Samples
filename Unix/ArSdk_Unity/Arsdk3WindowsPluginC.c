@@ -235,6 +235,10 @@ void ARDrone3_refreshAllStates(struct ARdrone3Plugin* self) {
     self->deviceController->common->sendCommonAllStates(self->deviceController->common);
 }
 
+void ARDrone3_Emergency(struct ARdrone3Plugin *self) {
+    self->deviceController->aRDrone3->sendPilotingEmergency(self->deviceController->aRDrone3);
+}
+
 void ARDrone3_TakeOff(struct ARdrone3Plugin *self) {
     self->deviceController->aRDrone3->sendPilotingTakeOff(self->deviceController->aRDrone3);
 }
