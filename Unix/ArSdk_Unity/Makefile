@@ -4,13 +4,13 @@ SDK_DIR=../../../ARSDKBuildUtils
 IDIR=./
 #CC=x86_64-w64-mingw32-gcc
 CC=/usr/bin/x86_64-w64-mingw32-gcc
-CFLAGS= -g -I$(IDIR) -I $(SDK_DIR)/Targets/Windows/Install/include -Dlocaltime_r=localtime
+CFLAGS= -g -I$(IDIR) -I $(SDK_DIR)/Targets/Windows/Install/include -I ffmpeg-2.7.2 -Dlocaltime_r=localtime
 
 OBJDIR=obj
 LDIR = $(SDK_DIR)/Targets/Windows/Install/lib
 
 #EXTERNAL_LIB=-lncurses -ljson
-EXTERNAL_LIB= -ljson -lwsock32 -lws2_32
+EXTERNAL_LIB= -ljson -lwsock32 -lws2_32 -Lffmpeg-2.7.2/libavcodec -lavcodec -Lffmpeg-2.7.2/libavutil -lavutil -Lffmpeg-2.7.2/libswscale -lswscale
 
 #LIBS= -g -L$(SDK_DIR)/Targets/Windows/Install/lib  -larcontroller -larcommands -lardiscovery -larstream  -larnetworkal -larnetwork  $(EXTERNAL_LIB)
 LIBS=-L$(SDK_DIR)/Targets/Windows/Install/lib -larcontroller -larcommands -lardiscovery -larstream -larnetwork -larnetworkal -larsal $(EXTERNAL_LIB)

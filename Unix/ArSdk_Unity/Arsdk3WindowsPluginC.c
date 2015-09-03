@@ -17,6 +17,8 @@ typedef uint32_t u_int32_t;
 #include <libARCommands/ARCommands.h>
 #include <libARController/ARCONTROLLER_Feature.h>
 #include "UnityMultiplatformSendMessage.h"
+#include <libavcodec/avcodec.h>
+#include <libswscale/swscale.h>
 
 // called when the state of the device controller has changed
 void stateChanged (eARCONTROLLER_DEVICE_STATE newState, eARCONTROLLER_ERROR error, void *customData);
@@ -41,22 +43,123 @@ void registerCallbacks (ARCONTROLLER_Device_t* deviceController);
 
 struct ARdrone3Plugin {
 	ARCONTROLLER_Device_t *deviceController;
-
+    AVPacket avpkt;
+    AVCodec *codec;
+    AVFrame *picture;
+    uint8_t *rgbData;
+    AVCodecContext *codecContext;
+    struct SwsContext* swsContext;
+    int frameCount;
 };
 
 void SetTextureFromUnity (void* texturePtr)
 {
-	
+	ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "UnityRenderEvent %p", texturePtr);
 }
 
 void UnityRenderEvent (int eventId, int width, int height)
 {
-	
+	ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "UnityRenderEvent eventId=%d width=%d height=%d", eventId, width, height);
 }
 
+typedef void (* UnityVideoCallback) (char * data, int width, int height);
 
-void didReceiveFrameCallback (ARCONTROLLER_Frame_t *frame, void *customData)
+
+static UnityVideoCallback lastVideoCallback = NULL;
+
+void ARdrone3_connectVideoCallback(UnityVideoCallback videoCallbackMethod) {
+    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "ARdrone3_connectVideoCallback");
+    lastVideoCallback = videoCallbackMethod;
+}
+
+void SendFrame (char * data, int width, int height) {
+    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "SendFrame %p %d %d", data, width, height);
+    if (lastVideoCallback != NULL) {
+        ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "Callback ok");
+        lastVideoCallback( data, width, height);
+        ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "Callback done");
+    }
+}
+
+void didReceiveFrameCallback (ARCONTROLLER_Frame_t *inputFrame, void *customData)
 {
+    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "didReceiveFrameCallback");
+    struct ARdrone3Plugin *self = (struct ARdrone3Plugin *) customData;
+
+    if(!self->codecContext || !self->codec)
+    {
+        ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "Decoder not initialized");
+        return;
+    }
+
+    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "Decoder ok");
+
+    self->avpkt.size = inputFrame->used;
+    self->avpkt.data = inputFrame->data;
+
+    int len, got_frame;
+    char buf[1024];
+
+    self->frameCount++;
+    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "avcodec_decode_video2 %d", self->frameCount);
+    len = avcodec_decode_video2(self->codecContext, self->picture, &got_frame, &self->avpkt);
+    if (len < 0) {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, TAG, "Error while decoding frame %d\n", self->frameCount);
+    }
+    else if (got_frame) {
+        ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "Decode frame %d success", self->frameCount);
+        ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, " - len = %d", len);
+        ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, " - picture->linesize[0] = %d", self->picture->linesize[0]);
+        ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, " - codecContext->width = %d", self->codecContext->width);
+        ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, " - codecContext->height = %d", self->codecContext->height);
+        ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, " - picture->format = %d", self->picture->format);
+
+        switch(self->picture->format)
+        {
+            case AV_PIX_FMT_YUV420P:
+                ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, " - AV_PIX_FMT_YUV420P");
+                break;
+            case AV_PIX_FMT_YUYV422:
+                ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, " - AV_PIX_FMT_YUYV422");
+                break;
+            case AV_PIX_FMT_RGB24:
+                ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, " - AV_PIX_FMT_RGB24");
+                break;
+            case AV_PIX_FMT_NV12:
+                ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, " - AV_PIX_FMT_NV12");
+                break;
+            default:
+                ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, " - Unknown format %d", self->picture->format);
+        }
+
+       
+        self->swsContext = sws_getCachedContext(self->swsContext, self->codecContext->width, self->codecContext->height,
+              self->picture->format, self->codecContext->width, self->codecContext->height,
+              AV_PIX_FMT_RGB24, 0, 0, 0, 0);
+
+        if(!self->swsContext)
+        {
+            ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "Fail to initialiaze filter");
+            return;
+        }
+
+
+        if(!self->rgbData)
+        {
+            self->rgbData = malloc(self->codecContext->width * self->codecContext->height * 3);
+        }
+
+
+
+        uint8_t * outData[1] = { self->rgbData }; // RGB24 have one plane
+        int outLinesize[1] = { 3*self->codecContext->width }; // RGB stride
+
+        const uint8_t* const* inData = (const uint8_t* const*) self->picture->data;
+        
+        sws_scale(self->swsContext, inData, self->picture->linesize, 0, self->codecContext->height, outData, outLinesize);
+        
+        SendFrame(self->rgbData, self->codecContext->width, self->codecContext->height);
+    }
 }
 
 FILE* logFile = NULL;
@@ -71,7 +174,6 @@ int PrintLog (eARSAL_PRINT_LEVEL level, const char *tag, const char *format, va_
 	fflush(logFile);
 }
 
-
 struct ARdrone3Plugin* ARdrone3_Connect() {
     ARSAL_Print_SetCallback(PrintLog);
     ARSAL_Print_SetMinimumLevel(ARSAL_PRINT_VERBOSE);
@@ -83,6 +185,12 @@ struct ARdrone3Plugin* ARdrone3_Connect() {
     ARDISCOVERY_Device_t *device = NULL;
     ARCONTROLLER_Device_t *deviceController = NULL;
     eARCONTROLLER_ERROR error = ARCONTROLLER_OK;
+    self->codec = NULL;
+    self->picture = NULL;
+    self->codecContext = NULL;
+    self->swsContext = NULL;
+    self->rgbData = NULL;
+     self->frameCount = 0;
     //ARSAL_Sem_Init (&(self->stateSem), 0, 0);
     
     // create a discovery device
@@ -152,7 +260,7 @@ struct ARdrone3Plugin* ARdrone3_Connect() {
 
     // add the frame received callback to be informed when a streaming frame has been received from the device
     ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "- set Video callback ... ");
-    error = ARCONTROLLER_Device_SetVideoReceiveCallback (self->deviceController, didReceiveFrameCallback, NULL , NULL);
+    error = ARCONTROLLER_Device_SetVideoReceiveCallback (self->deviceController, didReceiveFrameCallback, NULL , self);
     
     if (error != ARCONTROLLER_OK)
     {
@@ -173,7 +281,7 @@ struct ARdrone3Plugin* ARdrone3_Connect() {
     }
     registerCallbacks(self->deviceController);
     
-    
+    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "Connect done");
  
     
     return self;
@@ -181,18 +289,22 @@ struct ARdrone3Plugin* ARdrone3_Connect() {
 
 void ARdrone3_Disconnect(struct ARdrone3Plugin *self) {
     
-    ARCONTROLLER_Device_t *deviceController = NULL;
+    //ARCONTROLLER_Device_t *deviceController = NULL;
     eARCONTROLLER_ERROR error = ARCONTROLLER_OK;
     eARCONTROLLER_DEVICE_STATE deviceState = ARCONTROLLER_DEVICE_STATE_MAX;
     //ARSAL_Sem_Init (&(self->stateSem), 0, 0);
 
+    ARdrone3_connectCallback(NULL);
+
     //deviceController->aRDrone3->sendCameraOrientation();
-    deviceState = ARCONTROLLER_Device_GetState (deviceController, &error);
+    deviceState = ARCONTROLLER_Device_GetState (self->deviceController, &error);
+    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "ARCONTROLLER_Device_GetState deviceState=%d error=%d", deviceState, error);
     if ((error == ARCONTROLLER_OK) && (deviceState != ARCONTROLLER_DEVICE_STATE_STOPPED))
     {
         //////IHM_PrintInfo(ihm, "Disconnecting ...");
-        
-        error = ARCONTROLLER_Device_Stop (deviceController);
+
+        ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "ARCONTROLLER_Device_Stop");
+        error = ARCONTROLLER_Device_Stop (self->deviceController);
         
         if (error == ARCONTROLLER_OK)
         {
@@ -200,34 +312,49 @@ void ARdrone3_Disconnect(struct ARdrone3Plugin *self) {
             //ARSAL_Sem_Wait (&(self->stateSem));
         }
     }
+
+    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "-- ARdrone3_Disconnect END --");
     
-    ////IHM_PrintInfo(ihm, "");
-    ARCONTROLLER_Device_Delete (&deviceController);
-                
-    //ARSAL_Sem_Destroy (&(self->stateSem));
-    
-    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "-- END --");
-    
-    free(self);
 }
 
 void ARDrone3_StartVideo(struct ARdrone3Plugin* self) {
     
     eARCONTROLLER_ERROR error = ARCONTROLLER_OK;
-    boolean failed = 0;
+    
+    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "ARDrone3_StartVideo ... ");
+    error = self->deviceController->aRDrone3->sendMediaStreamingVideoEnable (self->deviceController->aRDrone3, 1);
+    if (error != ARCONTROLLER_OK)
+    {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, TAG, "- error :%s", ARCONTROLLER_Error_ToString(error));
+    }
+    
+    self->frameCount = 0;
+
+    av_init_packet(&self->avpkt);
+
+    // register all the codecs
+    avcodec_register_all();
+
+    // find the h264 video decoder
+    self->codec = avcodec_find_decoder(AV_CODEC_ID_H264);    
+    if (!self->codec) {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, TAG, "H264 Codec not found\n");
+        return;
+    }
+
+    self->codecContext = avcodec_alloc_context3(self->codec);
+    self->picture= av_frame_alloc();
+
+    // open it
+     if (avcodec_open2(self->codecContext, self->codec, NULL) < 0) {
+        ARSAL_PRINT(ARSAL_PRINT_ERROR, TAG, "Could not open codec\n");
+        return;
+    }
+
 
     
-    
-    if (!failed)
-    {
-        ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "- send StreamingVideoEnable ... ");
-        error = self->deviceController->aRDrone3->sendMediaStreamingVideoEnable (self->deviceController->aRDrone3, 1);
-        if (error != ARCONTROLLER_OK)
-        {
-            ARSAL_PRINT(ARSAL_PRINT_ERROR, TAG, "- error :%s", ARCONTROLLER_Error_ToString(error));
-            failed = 1;
-        }
-    }
+    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "ARDrone3_StartVideo ... done");
+
 }
 
 
@@ -251,8 +378,8 @@ void ARDrone3_SendCameraOrientation(struct ARdrone3Plugin *self, int tilt, int p
     self->deviceController->aRDrone3->sendCameraOrientation(self->deviceController->aRDrone3, tilt, pan);
 }
 
-void ARDrone3_SendPCMD(struct ARdrone3Plugin *self, int flag, int roll, int pitch, int yaw, int gaz) {
-    self->deviceController->aRDrone3->sendPilotingPCMD (self->deviceController->aRDrone3, flag , roll, pitch, yaw, gaz, 0);
+void ARDrone3_SetPCMD(struct ARdrone3Plugin *self, int flag, int roll, int pitch, int yaw, int gaz) {
+    self->deviceController->aRDrone3->setPilotingPCMD(self->deviceController->aRDrone3, flag , roll, pitch, yaw, gaz, 0);
 }
 
 void PilotingStateFlyingStateChangedCallback (eARCOMMANDS_ARDRONE3_PILOTINGSTATE_FLYINGSTATECHANGED_STATE state, void *custom) {
@@ -379,12 +506,27 @@ void registerCallbacks (ARCONTROLLER_Device_t* deviceController) {
 // called when the state of the device controller has changed
 void stateChanged (eARCONTROLLER_DEVICE_STATE newState, eARCONTROLLER_ERROR error, void *customData)
 {
-   ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "    - stateChanged newState: %d .....", newState);
+    ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "    - stateChanged newState: %d .....", newState);
     //struct ARdrone3Plugin* self = (struct ARdrone3Plugin*) customData;
     
     char sendingArg[5];
     snprintf(sendingArg, 5, "%d", (int)newState);
     UnitySendMessage("DeviceController", "updateDeviceControllerState", sendingArg);
+
+
+    if(newState == ARCONTROLLER_DEVICE_STATE_STOPPED)
+    {
+        struct ARdrone3Plugin* self = (struct ARdrone3Plugin*) customData;
+        //ARCONTROLLER_Device_t *deviceController = NULL;
+
+
+        ARSAL_PRINT(ARSAL_PRINT_INFO, TAG, "    - delete and free the plugin");
+        ////IHM_PrintInfo(ihm, "");
+        ARCONTROLLER_Device_Delete (&self->deviceController);
+
+        free(self);
+        //ARSAL_Sem_Destroy (&(self->stateSem));
+    }
 
     
 }
